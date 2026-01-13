@@ -7,24 +7,27 @@ import {
 import { randomUUID } from 'crypto';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import type { Request, Response } from 'express';
+
+type RequestWithId = Request & { id?: string };
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const http = context.switchToHttp();
-    const req = http.getRequest<Request & { id?: string }>();
-    const res = http.getResponse();
+    const req = http.getRequest<RequestWithId>();
+    const res = http.getResponse<Response>();
 
-    const headerId =
-      (req.headers as any)['x-request-id'] ||
-      (req.headers as any)['X-Request-Id'];
+    // Read header safely
+    const headerId = req.header('x-request-id'); // string | undefined
 
-    const requestId = typeof headerId === 'string' ? headerId : randomUUID();
+    const requestId = headerId && headerId.trim() ? headerId : randomUUID();
+
     req.id = requestId;
     res.setHeader('x-request-id', requestId);
 
-    const method = (req as any).method;
-    const url = (req as any).originalUrl ?? (req as any).url;
+    const method = req.method;
+    const path = req.originalUrl ?? req.url;
 
     const start = Date.now();
 
@@ -33,19 +36,20 @@ export class RequestLoggingInterceptor implements NestInterceptor {
         next: () => {
           const ms = Date.now() - start;
           const statusCode = res.statusCode;
-          // minimal structured log
+
           console.log(
-            JSON.stringify({ requestId, method, url, statusCode, ms }),
+            JSON.stringify({ requestId, method, path, statusCode, ms }),
           );
         },
         error: () => {
           const ms = Date.now() - start;
           const statusCode = res.statusCode;
+
           console.log(
             JSON.stringify({
               requestId,
               method,
-              url,
+              path,
               statusCode,
               ms,
               error: true,
