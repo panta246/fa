@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { finalize } from 'rxjs/operators';
 import type { Request, Response } from 'express';
 
 type RequestWithId = Request & { id?: string };
@@ -32,30 +32,19 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const start = Date.now();
 
     return next.handle().pipe(
-      tap({
-        next: () => {
-          const ms = Date.now() - start;
-          const statusCode = res.statusCode;
+      finalize(() => {
+        const ms = Date.now() - start;
+        const statusCode = res.statusCode;
 
-          console.log(
-            JSON.stringify({ requestId, method, path, statusCode, ms }),
-          );
-        },
-        error: () => {
-          const ms = Date.now() - start;
-          const statusCode = res.statusCode;
-
-          console.log(
-            JSON.stringify({
-              requestId,
-              method,
-              path,
-              statusCode,
-              ms,
-              error: true,
-            }),
-          );
-        },
+        console.log(
+          JSON.stringify({
+            requestId,
+            method,
+            path,
+            statusCode,
+            ms,
+          }),
+        );
       }),
     );
   }

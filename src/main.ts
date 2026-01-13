@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { RequestLoggingInterceptor } from './comon/interceptors/request-logging.interceptor';
 import { GlobalHttpExceptionFilter } from './comon/filters/http-exception.filter';
 
@@ -27,6 +27,14 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new RequestLoggingInterceptor());
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
+
+  app.enableShutdownHooks();
+
+  app.setGlobalPrefix('api');
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   await app.listen(port);
 }
