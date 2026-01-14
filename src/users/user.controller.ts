@@ -6,7 +6,7 @@ export class UsersController {
   @Post()
   create(@Body() dto: CreateUserDto) {
     // For now, no DB. Just prove validation works.
-    // throw new Error('boom');
+    throw new Error('boom');
     return {
       message: 'User accepted',
       data: dto,

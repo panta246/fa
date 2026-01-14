@@ -7,8 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { ErrorResponse } from '../types/error-response';
-
-// type RequestWithId = Request & { id?: string };
+import { redact } from '../logging/redact';
 
 function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -24,7 +23,6 @@ function toStringArray(value: unknown): string[] {
   }
 
   if (typeof value === 'object') {
-    // preserve information instead of "[object Object]"
     try {
       return [JSON.stringify(value)];
     } catch {
@@ -57,7 +55,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const method = req.method;
     const path = req.originalUrl ?? req.url;
 
-    let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+    let statusCode: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = 'Internal Server Error';
     let message: string[] = ['Unexpected error'];
 
@@ -66,11 +64,9 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       const resp = exception.getResponse();
 
       if (typeof resp === 'string') {
-        // sometimes Nest returns a string response
         error = exception.name;
         message = [resp];
       } else if (resp && typeof resp === 'object') {
-        // typical shape: { statusCode, message, error }
         const r = resp as Record<string, unknown>;
         error = typeof r.error === 'string' ? r.error : exception.name;
         message = toStringArray(r.message ?? exception.message);
@@ -82,6 +78,10 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       message = [exception.message];
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && statusCode >= 500) {
+      message = ['Internal server error'];
+    }
     const body: ErrorResponse = {
       requestId,
       path,
@@ -92,23 +92,30 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       timestamp: Date.now(),
     };
 
-    // Server-side log (can be improved later)
-    console.error(
-      JSON.stringify({
-        requestId,
-        method,
-        path,
-        statusCode,
-        exception:
-          exception instanceof Error
-            ? {
-                name: exception.name,
-                message: exception.message,
-                stack: exception.stack,
-              }
-            : exception,
-      }),
-    );
+    const logBase = {
+      requestId,
+      path,
+      method,
+      statusCode,
+      error,
+      message,
+    };
+
+    if (statusCode >= 500) {
+      const err =
+        exception instanceof Error
+          ? {
+              name: exception.name,
+              message: exception.message,
+              stack: exception.stack,
+            }
+          : exception;
+
+      console.error(JSON.stringify({ ...logBase, exception: redact(err) }));
+    } else {
+      // 4xx: expected
+      console.warn(JSON.stringify(logBase));
+    }
 
     res.status(statusCode).json(body);
   }
