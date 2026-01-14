@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { RequestLoggingInterceptor } from './comon/interceptors/request-logging.interceptor';
 import { GlobalHttpExceptionFilter } from './comon/filters/http-exception.filter';
+import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,6 +31,18 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
   app.enableShutdownHooks();
+
+  // every request bad or right will have requestId for log
+  app.use((req: Request, res: Response, next: () => void) => {
+    const headerId = req.headers['x-request-id'];
+    const requestId =
+      typeof headerId === 'string' && headerId.trim() ? headerId : randomUUID();
+
+    req.id = requestId;
+    res.setHeader('x-request-id', requestId);
+
+    next();
+  });
 
   app.setGlobalPrefix('api');
   app.enableVersioning({

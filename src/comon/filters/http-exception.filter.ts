@@ -8,7 +8,7 @@ import {
 import type { Request, Response } from 'express';
 import type { ErrorResponse } from '../types/error-response';
 
-type RequestWithId = Request & { id?: string };
+// type RequestWithId = Request & { id?: string };
 
 function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -50,7 +50,7 @@ function toStringArray(value: unknown): string[] {
 export class GlobalHttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const req = ctx.getRequest<RequestWithId>();
+    const req = ctx.getRequest<Request>();
     const res = ctx.getResponse<Response>();
 
     const requestId = req.id ?? null;
